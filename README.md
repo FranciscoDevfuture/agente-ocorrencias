@@ -81,8 +81,8 @@ No app, acesse **Configurações** e informe:
 ## 👤 Autor
 
 **Francisco José Santos**
-- OTU — Operação de Trânsito Urbano
-- Estudante de Engenharia de Software — UniFECAF
+- OTU — Operador de Terminal Urbano
+- Estudante de Análise e Desenvolvimento de Sistemas — UniFECAF
 - GitHub: [@FranciscoDevfuture](https://github.com/FranciscoDevfuture)
 
 ---
