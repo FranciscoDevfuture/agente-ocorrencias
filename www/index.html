@@ -1,0 +1,2311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Agente de Ocorrências</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: rgba(0,0,0,0); }
+  html, body { touch-action: manipulation; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3352;
+    --accent: #4f7ef7;
+    --accent2: #3ecf8e;
+    --danger: #f75c5c;
+    --warn: #f7a535;
+    --text: #e8eaf6;
+    --text2: #8892b0;
+    --bubble-out: #1e3a5f;
+    --bubble-in: #1e2235;
+    --radius: 18px;
+    --radius-sm: 10px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .screen { display: none; flex-direction: column; height: 100vh; }
+  .screen.active { display: flex; }
+
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .header-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), #6c4ff7);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .header-title { font-weight: 700; font-size: 16px; }
+  .header-sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .header-btn {
+    margin-left: auto;
+    background: none; border: none; color: var(--text2);
+    font-size: 20px; cursor: pointer; padding: 4px 8px;
+    border-radius: 8px;
+  }
+  .header-btn:active { background: var(--border); }
+
+  #screen-home { padding: 0; }
+  .home-hero {
+    background: linear-gradient(160deg, #0f1117 0%, #1a1d27 50%, #0f1117 100%);
+    padding: 32px 20px 24px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .home-logo {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, var(--accent), #6c4ff7);
+    border-radius: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; margin: 0 auto 14px;
+    box-shadow: 0 8px 32px rgba(79,126,247,0.3);
+  }
+  .home-title { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .home-sub { font-size: 13px; color: var(--text2); margin-top: 6px; }
+  .home-actions { padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; overflow-y: auto; }
+  .action-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    display: flex; align-items: center; gap: 14px;
+    cursor: pointer; transition: none; text-align: left;
+    width: 100%;
+  }
+  .action-btn:active { transform: scale(0.98); background: var(--surface2); }
+  .action-icon {
+    width: 46px; height: 46px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .action-icon.red { background: rgba(247,92,92,0.15); }
+  .action-icon.blue { background: rgba(79,126,247,0.15); }
+  .action-icon.green { background: rgba(62,207,142,0.15); }
+  .action-icon.gray { background: rgba(136,146,176,0.15); }
+  .action-text { flex: 1; }
+  .action-label { font-weight: 600; font-size: 15px; }
+  .action-desc { font-size: 12px; color: var(--text2); margin-top: 3px; }
+  .action-arrow { color: var(--text2); font-size: 18px; }
+
+  .offline-badge {
+    background: rgba(247,165,53,0.15);
+    border: 1px solid rgba(247,165,53,0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--warn);
+    display: flex; align-items: center; gap: 6px;
+    margin: 0 16px 4px;
+  }
+  .offline-badge.hidden { display: none; }
+
+  .progress-bar-wrap {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    flex-shrink: 0;
+  }
+  .progress-bar-track {
+    background: var(--border);
+    border-radius: 99px;
+    height: 4px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 99px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+  .progress-label {
+    font-size: 11px; color: var(--text2);
+    margin-top: 5px; display: flex; justify-content: space-between;
+  }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto;
+    padding: 16px 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    scroll-behavior: smooth;
+  }
+  .msg {
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 14px; line-height: 1.5;
+    word-break: break-word;
+    animation: fadeUp 0.2s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg-bot {
+    background: var(--bubble-in);
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+  }
+  .msg-user {
+    background: var(--bubble-out);
+    border-bottom-right-radius: 4px;
+    align-self: flex-end;
+    color: #c8d8ff;
+  }
+  .msg-system {
+    background: rgba(247,165,53,0.1);
+    border: 1px solid rgba(247,165,53,0.25);
+    border-radius: var(--radius-sm);
+    color: var(--warn);
+    align-self: center;
+    font-size: 12px;
+    text-align: center;
+    max-width: 90%;
+  }
+  .msg-typing {
+    background: var(--bubble-in);
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+    padding: 12px 16px;
+  }
+  .typing-dots { display: flex; gap: 4px; }
+  .typing-dots span {
+    width: 7px; height: 7px; background: var(--text2);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce {
+    0%,60%,100% { transform: translateY(0); }
+    30% { transform: translateY(-5px); }
+  }
+
+  .quick-replies {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 4px 12px 8px;
+    flex-shrink: 0;
+  }
+  .qr-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 7px 14px;
+    font-size: 13px; color: var(--text);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .qr-btn:active { background: var(--accent); border-color: var(--accent); }
+
+  .chat-input-wrap {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: flex; gap: 8px; align-items: flex-end;
+    flex-shrink: 0;
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 10px 16px;
+    font-size: 14px; color: var(--text);
+    resize: none; outline: none;
+    max-height: 100px; overflow-y: auto;
+    line-height: 1.4;
+    font-family: inherit;
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-send {
+    width: 42px; height: 42px;
+    background: var(--accent);
+    border: none; border-radius: 50%;
+    color: white; font-size: 18px;
+    cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .chat-send:active { transform: scale(0.9); }
+  .chat-send:disabled { background: var(--border); }
+
+  #screen-relatorio .report-body {
+    flex: 1; overflow-y: auto;
+    padding: 20px 16px;
+  }
+  .report-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    font-size: 14px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .report-actions {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex; gap: 10px;
+    flex-shrink: 0;
+  }
+  .report-btn {
+    flex: 1;
+    padding: 13px 8px;
+    border-radius: var(--radius-sm);
+    border: none; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    gap: 6px; transition: all 0.15s;
+  }
+  .report-btn:active { transform: scale(0.97); }
+  .report-btn.pdf { background: var(--danger); color: white; }
+  .report-btn.whatsapp { background: #25d366; color: white; }
+  .report-btn.salvar { background: var(--accent); color: white; }
+
+  #screen-historico .hist-list {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .hist-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .hist-item:active { background: var(--surface2); }
+  .hist-item-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .hist-nome { font-weight: 600; font-size: 15px; }
+  .hist-data { font-size: 11px; color: var(--text2); }
+  .hist-local { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .hist-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .hist-tag {
+    font-size: 11px; padding: 3px 8px;
+    border-radius: 99px;
+  }
+  .hist-tag.consciente { background: rgba(62,207,142,0.15); color: var(--accent2); }
+  .hist-tag.inconsciente { background: rgba(247,92,92,0.15); color: var(--danger); }
+  .hist-tag.samu { background: rgba(247,165,53,0.15); color: var(--warn); }
+  .hist-tag.recusa { background: rgba(136,146,176,0.15); color: var(--text2); }
+  .hist-empty {
+    text-align: center; color: var(--text2);
+    padding: 60px 20px; font-size: 14px;
+  }
+  .hist-empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .hist-delete {
+    background: none; border: none; color: var(--danger);
+    font-size: 16px; padding: 4px 8px; cursor: pointer;
+    border-radius: 6px; margin-left: 8px;
+  }
+
+  #screen-config .config-body {
+    flex: 1; overflow-y: auto; padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .config-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .config-label {
+    padding: 14px 16px 4px;
+    font-size: 11px; font-weight: 700;
+    color: var(--accent); text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .config-field { padding: 4px 16px 14px; }
+  .config-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    font-size: 14px; color: var(--text);
+    outline: none; font-family: monospace;
+  }
+  .config-input:focus { border-color: var(--accent); }
+  .config-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
+  .config-save {
+    width: 100%;
+    background: var(--accent);
+    border: none; border-radius: var(--radius-sm);
+    padding: 14px; color: white;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .config-save:active { transform: scale(0.98); }
+
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none; align-items: flex-end; justify-content: center;
+    z-index: 100;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border: 1px solid var(--border);
+    width: 100%; max-height: 80dvh;
+    display: flex; flex-direction: column;
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+  .modal-header {
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-weight: 700; font-size: 16px; }
+  .modal-close {
+    background: none; border: none; color: var(--text2);
+    font-size: 22px; cursor: pointer; padding: 0 4px;
+  }
+  .modal-body { overflow-y: auto; padding: 16px; }
+  .modal-report { font-size: 13px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+  .modal-actions {
+    padding: 12px 16px;
+    display: flex; gap: 10px;
+    border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+
+  .fotos-section {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .fotos-titulo { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 12px; }
+  .fotos-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+  .foto-add {
+    width: 110px; height: 110px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-sm);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .foto-add:active { border-color: var(--accent); background: var(--surface2); }
+  .foto-thumb {
+    width: 110px; height: 110px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    position: relative;
+  }
+  .foto-wrap { position: relative; display: inline-block; }
+  .foto-del {
+    position: absolute; top: 4px; right: 4px;
+    background: rgba(0,0,0,0.7); color: white;
+    border: none; border-radius: 50%;
+    width: 24px; height: 24px; font-size: 14px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .modal-fotos-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .modal-foto-thumb { width: 100%; max-width: 100%; border-radius: var(--radius-sm); object-fit: cover; }
+
+  .foto-opcoes {
+    display: flex; flex-direction: column; gap: 10px; padding: 8px 0;
+  }
+  .foto-opcao-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex; align-items: center; gap: 14px;
+    cursor: pointer; font-size: 15px; color: var(--text);
+    transition: all 0.15s;
+  }
+  .foto-opcao-btn:active { background: var(--accent); border-color: var(--accent); }
+  .foto-opcao-icon { font-size: 28px; }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="screen-home" class="screen active">
+  <div class="home-hero">
+    <div class="home-logo">🚌</div>
+    <div class="home-title">Agente de Ocorrências</div>
+    <div class="home-sub">Terminal · Registro de Ocorrências</div>
+  </div>
+  <div class="offline-badge hidden" id="offline-badge">
+    ⚡ Sem internet — modo offline ativo
+  </div>
+  <div class="home-actions">
+    <button class="action-btn" data-action="btn-mal-subito">
+      <div class="action-icon red">🆘</div>
+      <div class="action-text">
+        <div class="action-label">Mal Súbito</div>
+        <div class="action-desc">Atendimento de mal súbito</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+    <button class="action-btn" data-action="btn-acidente-usuario">
+      <div class="action-icon" style="background:rgba(247,165,53,0.15)">🤕</div>
+      <div class="action-text">
+        <div class="action-label">Acidente com Usuário</div>
+        <div class="action-desc">Queda, colisão ou lesão</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+    <button class="action-btn" data-action="btn-acidente-coletivo">
+      <div class="action-icon" style="background:rgba(108,79,247,0.15)">🚌</div>
+      <div class="action-text">
+        <div class="action-label">Acidente com Coletivo</div>
+        <div class="action-desc">Colisão entre veículos</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+    <button class="action-btn" data-action="btn-historico">
+      <div class="action-icon blue">📋</div>
+      <div class="action-text">
+        <div class="action-label">Histórico</div>
+        <div class="action-desc">Ocorrências registradas</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+    <button class="action-btn" data-action="btn-config">
+      <div class="action-icon gray">⚙️</div>
+      <div class="action-text">
+        <div class="action-label">Configurações</div>
+        <div class="action-desc">Chave da API Groq</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+  </div>
+</div>
+
+<!-- TELA: TIPO -->
+<div id="screen-tipo" class="screen">
+  <div class="header">
+    <button class="header-btn" data-action="btn-home" style="margin-left:0;margin-right:4px;">‹</button>
+    <div class="header-icon">📋</div>
+    <div>
+      <div class="header-title">Tipo de Ocorrência</div>
+      <div class="header-sub">Selecione o tipo para registrar</div>
+    </div>
+  </div>
+  <div class="home-actions">
+    <button class="action-btn" data-action="btn-mal-subito-tipo">
+      <div class="action-icon red">🆘</div>
+      <div class="action-text">
+        <div class="action-label">Mal Súbito</div>
+        <div class="action-desc">Usuário com problema de saúde</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+    <button class="action-btn" data-action="btn-acidente-usuario-tipo">
+      <div class="action-icon" style="background:rgba(247,165,53,0.15)">🤕</div>
+      <div class="action-text">
+        <div class="action-label">Acidente com Usuário</div>
+        <div class="action-desc">Queda, colisão ou lesão envolvendo usuário</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+    <button class="action-btn" data-action="btn-acidente-coletivo-tipo">
+      <div class="action-icon" style="background:rgba(79,126,247,0.15)">🚌</div>
+      <div class="action-text">
+        <div class="action-label">Acidente com Coletivo</div>
+        <div class="action-desc">Colisão entre coletivos ou com veículo particular</div>
+      </div>
+      <div class="action-arrow">›</div>
+    </button>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="screen-chat" class="screen">
+  <div class="header">
+    <button class="header-btn" data-action="btn-cancelar" style="margin-left:0;margin-right:4px;">‹</button>
+    <div class="header-icon">🆘</div>
+    <div>
+      <div class="header-title" id="chat-tipo-titulo">Nova Ocorrência</div>
+      <div class="header-sub" id="chat-status">Iniciando...</div>
+    </div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="progress-label">
+      <span id="progress-fase">Dados da ocorrência</span>
+      <span id="progress-pct">0%</span>
+    </div>
+  </div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <div class="quick-replies" id="quick-replies"></div>
+  <div class="chat-input-wrap">
+    <textarea class="chat-input" id="chat-input" placeholder="Digite sua resposta..." rows="1" oninput="autoResize(this)"></textarea>
+    <button class="chat-send" data-action="btn-send">➤</button>
+  </div>
+</div>
+
+<!-- RELATÓRIO -->
+<div id="screen-relatorio" class="screen">
+  <div class="header">
+    <button class="header-btn" data-action="btn-home-relatorio" style="margin-left:0;margin-right:4px;">‹</button>
+    <div class="header-icon">📄</div>
+    <div>
+      <div class="header-title">Relatório Gerado</div>
+      <div class="header-sub">Ocorrência finalizada</div>
+    </div>
+    <button class="header-btn" data-action="btn-corrigir">✏️</button>
+  </div>
+  <div class="report-body">
+    <div class="report-card" id="report-text"></div>
+    <div class="fotos-section">
+      <div class="fotos-titulo">📷 Fotos da ocorrência (máx. 2)</div>
+      <div class="fotos-grid" id="fotos-grid">
+        <div class="foto-add" data-action="btn-adicionar-foto">
+          <div style="font-size:32px">📷</div>
+          <div style="font-size:13px;margin-top:6px;color:var(--text2)">Câmera ou galeria</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="report-actions">
+    <button class="report-btn pdf" data-action="btn-pdf">📄 PDF</button>
+    <button class="report-btn whatsapp" data-action="btn-whatsapp">📲 WhatsApp</button>
+    <button class="report-btn salvar" data-action="btn-salvar">💾 Salvar</button>
+  </div>
+</div>
+
+<!-- HISTÓRICO -->
+<div id="screen-historico" class="screen">
+  <div class="header">
+    <button class="header-btn" data-action="btn-home-historico" style="margin-left:0;margin-right:4px;">‹</button>
+    <div class="header-icon">📋</div>
+    <div>
+      <div class="header-title">Histórico</div>
+      <div class="header-sub" id="hist-count">Carregando...</div>
+    </div>
+  </div>
+  <div class="hist-list" id="hist-list"></div>
+</div>
+
+<!-- CONFIG -->
+<div id="screen-config" class="screen">
+  <div class="header">
+    <button class="header-btn" data-action="btn-home-config" style="margin-left:0;margin-right:4px;">‹</button>
+    <div class="header-icon">⚙️</div>
+    <div>
+      <div class="header-title">Configurações</div>
+      <div class="header-sub">API e preferências</div>
+    </div>
+  </div>
+  <div class="config-body">
+    <div class="config-section">
+      <div class="config-label">Chave API Groq</div>
+      <div class="config-field">
+        <input type="password" class="config-input" id="config-groq-key" placeholder="gsk_..." autocomplete="off">
+        <div class="config-hint">Obtenha sua chave em console.groq.com → API Keys</div>
+      </div>
+    </div>
+    <div class="config-section">
+      <div class="config-label">Terminal padrão</div>
+      <div class="config-field">
+        <input type="text" class="config-input" id="config-terminal" placeholder="Ex: Terminal Campo Limpo">
+        <div class="config-hint">Será sugerido automaticamente em novas ocorrências</div>
+      </div>
+    </div>
+    <div class="config-section">
+      <div class="config-label">Identificação do atendente</div>
+      <div class="config-field">
+        <input type="text" class="config-input" id="config-atendente" placeholder="Ex: OTU / Francisco José / RE 266">
+        <div class="config-hint">Pré-preenche o campo de equipe automaticamente</div>
+      </div>
+    </div>
+    <button class="config-save" data-action="btn-salvar-config">Salvar configurações</button>
+  </div>
+</div>
+
+<!-- MODAL HISTÓRICO -->
+<div class="modal-overlay" id="modal-hist">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-hist-title">Ocorrência</div>
+      <button class="modal-close" data-action="btn-fechar-modal-hist">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-report" id="modal-hist-text"></div>
+      <div class="modal-fotos-grid" id="modal-hist-fotos"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="report-btn pdf" data-action="btn-pdf-hist">📄 PDF</button>
+      <button class="report-btn whatsapp" data-action="btn-whatsapp-hist">📲 WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CORREÇÃO -->
+<div class="modal-overlay" id="modal-correcao">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Solicitar correção</div>
+      <button class="modal-close" data-action="btn-fechar-modal-correcao">×</button>
+    </div>
+    <div class="modal-body">
+      <textarea class="config-input" id="correcao-input" rows="4"
+        placeholder="Descreva o que precisa ser corrigido no relatório..."
+        style="height:100px;resize:none;width:100%;font-family:inherit;font-size:14px;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="report-btn salvar" style="flex:1" data-action="btn-aplicar-correcao">Aplicar correção</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FOTO -->
+<div class="modal-overlay" id="modal-foto-opcao">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Adicionar foto</div>
+      <button class="modal-close" data-action="btn-fechar-modal-foto">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="foto-opcoes">
+        <button class="foto-opcao-btn" data-action="btn-camera">
+          <span class="foto-opcao-icon">📷</span>
+          <div>
+            <div style="font-weight:600">Tirar foto</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">Abrir câmera agora</div>
+          </div>
+        </button>
+        <button class="foto-opcao-btn" data-action="btn-galeria">
+          <span class="foto-opcao-icon">🖼️</span>
+          <div>
+            <div style="font-weight:600">Escolher da galeria</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">Selecionar foto existente</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+console.log("✅ JS carregado com sucesso");
+
+// ════════════════════════════════════════════════════════════
+// MODELOS DE RELATÓRIO
+// ════════════════════════════════════════════════════════════
+const MODELOS = {
+  mal_subito: null,
+  acidente_usuario: `Venho informar que por volta das [HORA], ocorreu um acidente envolvendo usuário no [LOCAL] do [TERMINAL]. O(a) usuário(a) [NOME], portador(a) do RG nº [RG] e CPF nº [CPF], [COMO ACONTECEU]. O(a) usuário(a) encontrava-se [ESTADO CLINICO], [SINAIS VITAIS]. [SAMU]. A equipe de OTU, composta por [EQUIPE], prestou o atendimento e [DESFECHO]. A ocorrência foi encerrada às [HORA FINALIZACAO]. Cientes: [CIENTES].`,
+  acidente_coletivo: `Venho informar que por volta das [HORA], ocorreu um acidente de trânsito no [LOCAL] do [TERMINAL], envolvendo [TIPO ACIDENTE]. O coletivo [LINHA], prefixo [PREFIXO], era operado pelo motorista [NOME OPERADOR], chapa [CHAPA OPERADOR]. [SEGUNDO VEICULO]. [VITIMAS]. [PM GCM]. A equipe de OTU, composta por [EQUIPE], realizou o atendimento da ocorrência. A ocorrência foi encerrada às [HORA FINALIZACAO]. Cientes: [CIENTES].`,
+};
+
+// ════════════════════════════════════════════════════════════
+// FLUXOS DE PERGUNTAS
+// ════════════════════════════════════════════════════════════
+
+// Mal Súbito
+const FLUXO_INICIAL = [
+  { campo: 'horario', label: 'Horário da ocorrência',
+    texto: 'Por volta de que horário ocorreu a ocorrência?',
+    dica: 'Ex: "05h30"', fase: 'Dados da ocorrência' },
+  { campo: 'local', label: 'Local',
+    texto: 'Qual o local exato onde ocorreu?',
+    dica: 'Ex: "Plataforma 1, Saguão, dentro do coletivo linha 6820"', fase: 'Dados da ocorrência' },
+  { campo: 'usuario_nome', label: 'Nome do(a) usuário(a)',
+    texto: 'Qual o nome do(a) usuário(a)?',
+    dica: 'Ex: "Maria Julia" ou "não identificado"', fase: 'Dados do usuário' },
+  { campo: 'idade', label: 'Idade', opcional: true,
+    texto: (d) => `Qual a idade do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "45 anos" — ou toque em Pular', fase: 'Dados do usuário',
+    quickReplies: ['Pular'] },
+  { campo: 'usuario_rg', label: 'RG', opcional: true,
+    texto: (d) => `Qual o RG do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "58.915.883-1" — ou toque em Pular', fase: 'Dados do usuário',
+    quickReplies: ['Pular'] },
+  { campo: 'usuario_cpf', label: 'CPF', opcional: true,
+    texto: (d) => `Qual o CPF do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "008.439.788-80" — ou toque em Pular', fase: 'Dados do usuário',
+    quickReplies: ['Pular'] },
+  { campo: 'consciente', label: 'Consciente?',
+    texto: (d) => `O(a) ${d.usuario_nome || 'usuário(a)'} estava consciente?`,
+    dica: '', fase: 'Avaliação clínica',
+    quickReplies: ['Sim', 'Não'] },
+];
+
+const FLUXO_CONSCIENTE = [
+  { campo: 'situacao', label: 'Queixa principal',
+    texto: (d) => `Qual a queixa principal do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "Dor de cabeça e tontura após queda"', fase: 'Avaliação clínica' },
+  { campo: 'info_adicional', label: 'Informação adicional', opcional: true,
+    texto: (d) => `Alguma informação adicional sobre o(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "Grávida de 2 meses, diabético..." — ou Pular', fase: 'Avaliação clínica',
+    quickReplies: ['Pular'] },
+  { campo: 'nivel_consciencia', label: 'Nível de consciência', opcional: true,
+    texto: 'Qual o nível de consciência observado?',
+    dica: 'Ex: "Orientada e consciente" — ou Pular', fase: 'Avaliação clínica',
+    quickReplies: ['Orientado(a) e consciente', 'Pular'] },
+  { campo: 'sinais_vitais', label: 'Sinais vitais', opcional: true,
+    texto: 'Foram aferidos os sinais vitais?',
+    dica: 'Ex: "PA 130/90, FC 88bpm" — ou Pular', fase: 'Avaliação clínica',
+    quickReplies: ['Não foram aferidos', 'Pular'] },
+  { campo: 'cadeira_rodas', label: 'Cadeira de rodas',
+    texto: 'Foi necessário o uso de cadeira de rodas?',
+    dica: '', fase: 'Avaliação clínica',
+    quickReplies: ['Sim', 'Não'] },
+  { campo: 'aceita_socorro', label: 'Aceitou ser conduzido(a)?',
+    texto: (d) => `O(a) ${d.usuario_nome || 'usuário(a)'} aceitou ser conduzido(a) para atendimento?`,
+    dica: '', fase: 'Avaliação clínica',
+    quickReplies: ['Sim', 'Não'] },
+];
+
+const FLUXO_DESTINO = [
+  { campo: 'hospital_destino', label: 'Destino',
+    texto: 'Qual o destino para atendimento médico?',
+    dica: 'Ex: "UPA Campo Limpo"', fase: 'Destino' },
+];
+
+const FLUXO_RECUSA = [
+  { campo: 'recusa_confirmada', label: 'Termo de recusa',
+    texto: '⚠️ O(a) usuário(a) recusou ser conduzido(a).\n\nSolicite a assinatura do Termo de Recusa como prova do atendimento oferecido.\n\nConfirme quando a assinatura for colhida:',
+    dica: '', fase: 'Recusa de atendimento',
+    quickReplies: ['✅ Assinatura colhida'] },
+];
+
+const FLUXO_INCONSCIENTE = [
+  { campo: 'situacao', label: 'Situação observada',
+    texto: (d) => `Qual a situação observada do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "Sem resposta, desacordado, convulsionando"', fase: 'Avaliação clínica' },
+  { campo: 'sinais_vitais', label: 'Sinais vitais', opcional: true,
+    texto: 'Foram aferidos os sinais vitais?',
+    dica: 'Ex: "PA 130/90, FC 88bpm" — ou Pular', fase: 'Avaliação clínica',
+    quickReplies: ['Não foram aferidos', 'Pular'] },
+];
+
+const FLUXO_EQUIPE = [
+  { campo: 'equipe', label: 'Equipe de atendimento',
+    texto: 'Qual a equipe que realizou o atendimento?',
+    dica: 'Formato: CARGO / NOME / RE\nEx: OTU / Francisco José / RE 266', fase: 'Equipe' },
+];
+
+const FLUXO_PERGUNTA_SAMU = [
+  { campo: 'samu_solicitado', label: 'SAMU acionado?',
+    texto: 'O SAMU foi acionado?',
+    dica: '', fase: 'SAMU',
+    quickReplies: ['Sim', 'Não'] },
+];
+
+const FLUXO_SAMU = [
+  { campo: 'samu_horario_contato', label: 'Horário do contato SAMU',
+    texto: 'Qual o horário do contato com o SAMU?',
+    dica: 'Ex: "05h35"', fase: 'Dados do SAMU' },
+  { campo: 'samu_atendente', label: 'Atendente SAMU',
+    texto: 'Qual o nome da atendente do SAMU?',
+    dica: 'Ex: "Ana"', fase: 'Dados do SAMU' },
+  { campo: 'samu_protocolo', label: 'Protocolo SAMU',
+    texto: 'Qual o número do protocolo?',
+    dica: 'Ex: "20260694054"', fase: 'Dados do SAMU' },
+  { campo: 'samu_horario_chegada', label: 'Chegada do SAMU',
+    texto: 'Qual o horário de chegada do SAMU?',
+    dica: 'Ex: "05h48"', fase: 'Dados do SAMU' },
+  { campo: 'samu_horario_saida', label: 'Saída do SAMU',
+    texto: 'Qual o horário de saída do SAMU?',
+    dica: 'Ex: "06h05"', fase: 'Dados do SAMU' },
+  { campo: 'samu_placa', label: 'Placa da viatura',
+    texto: 'Qual a placa da viatura do SAMU?',
+    dica: 'Ex: "DJM-5625"', fase: 'Dados do SAMU' },
+  { campo: 'samu_prefixo', label: 'Prefixo da viatura',
+    texto: 'Qual o prefixo da viatura?',
+    dica: 'Ex: "AM-0945"', fase: 'Dados do SAMU' },
+  { campo: 'samu_equipe', label: 'Equipe SAMU', opcional: true,
+    texto: 'Qual a equipe do SAMU?',
+    dica: 'Ex: Médico / Dr. Carlos / CRM 23633 — ou Pular', fase: 'Dados do SAMU',
+    quickReplies: ['Pular'] },
+];
+
+const FLUXO_COLETIVO = [
+  { campo: 'coletivo_linha', label: 'Linha do coletivo',
+    texto: 'Em qual linha de coletivo a vítima será conduzida?\n\n⚠️ Se a ocorrência foi dentro do coletivo, a vítima NÃO pode ser retirada — o próprio coletivo a conduz.',
+    dica: 'Ex: "Linha 6820/10 Terminal Santo Amaro"', fase: 'Coletivo' },
+  { campo: 'coletivo_motorista', label: 'Motorista',
+    texto: 'Qual o nome e chapa do motorista?',
+    dica: 'Ex: "Carlos, chapa 8929"', fase: 'Coletivo' },
+  { campo: 'coletivo_cobrador', label: 'Cobrador', opcional: true,
+    texto: 'Qual o nome e chapa do cobrador?',
+    dica: 'Ex: "Luis, chapa 89393" — ou Pular', fase: 'Coletivo',
+    quickReplies: ['Pular'] },
+];
+
+const FLUXO_DESFECHO = [
+  { campo: 'cientes', label: 'Cientes',
+    texto: 'Quem estava ciente da ocorrência?',
+    dica: 'Formato: CARGO / NOME / RE\nEx: ET / Rafael Rocha / RE 208', fase: 'Desfecho' },
+  { campo: 'horario_finalizacao', label: 'Horário de finalização',
+    texto: 'Qual o horário de finalização da ocorrência?',
+    dica: 'Ex: "06h12"', fase: 'Desfecho' },
+  { campo: 'observacoes', label: 'Observações finais', opcional: true,
+    texto: 'Há alguma observação adicional?',
+    dica: 'Ex: "Nenhuma" — ou Pular', fase: 'Desfecho',
+    quickReplies: ['Pular'] },
+];
+
+// Acidente com Usuário
+const FLUXO_ACID_USU_INICIAL = [
+  { campo: 'horario', label: 'Horário', fase: 'Dados da ocorrência',
+    texto: 'Por volta de que horário ocorreu o acidente?',
+    dica: 'Ex: "14h30"' },
+  { campo: 'local', label: 'Local', fase: 'Dados da ocorrência',
+    texto: 'Qual o local exato onde ocorreu?',
+    dica: 'Ex: "Plataforma 2, Saguão principal, escada de acesso"' },
+  { campo: 'como_aconteceu', label: 'Como aconteceu', fase: 'Dados da ocorrência',
+    texto: 'Como o acidente aconteceu?',
+    dica: 'Ex: "Usuário sofreu queda na plataforma", "Foi atingido pela porta do coletivo"' },
+  { campo: 'usuario_nome', label: 'Nome do usuário', fase: 'Dados do usuário',
+    texto: 'Qual o nome do(a) usuário(a)?',
+    dica: 'Ex: "João Silva" ou "não identificado"' },
+  { campo: 'idade', label: 'Idade', fase: 'Dados do usuário', opcional: true,
+    texto: (d) => `Qual a idade do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "52 anos" — ou Pular',
+    quickReplies: ['Pular'] },
+  { campo: 'usuario_rg', label: 'RG', fase: 'Dados do usuário', opcional: true,
+    texto: (d) => `Qual o RG do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "58.915.883-1" — ou Pular',
+    quickReplies: ['Pular'] },
+  { campo: 'usuario_cpf', label: 'CPF', fase: 'Dados do usuário', opcional: true,
+    texto: (d) => `Qual o CPF do(a) ${d.usuario_nome || 'usuário(a)'}?`,
+    dica: 'Ex: "008.439.788-80" — ou Pular',
+    quickReplies: ['Pular'] },
+  { campo: 'consciente', label: 'Consciente?', fase: 'Avaliação clínica',
+    texto: (d) => `O(a) ${d.usuario_nome || 'usuário(a)'} está consciente?`,
+    dica: '',
+    quickReplies: ['Sim', 'Não'] },
+];
+
+const FLUXO_ACID_USU_CONSCIENTE = [
+  { campo: 'situacao', label: 'Lesões / queixas', fase: 'Avaliação clínica',
+    texto: 'Quais as lesões ou queixas apresentadas?',
+    dica: 'Ex: "Dor no joelho, escoriações no braço, queixa de tontura"' },
+  { campo: 'sinais_vitais', label: 'Sinais vitais', fase: 'Avaliação clínica', opcional: true,
+    texto: 'Foram aferidos os sinais vitais?',
+    dica: 'Ex: "PA 120/80, FC 80bpm" — ou Pular',
+    quickReplies: ['Não foram aferidos', 'Pular'] },
+  { campo: 'aceita_socorro', label: 'Aceitou atendimento?', fase: 'Avaliação clínica',
+    texto: (d) => `O(a) ${d.usuario_nome || 'usuário(a)'} aceitou ser conduzido(a) para atendimento?`,
+    dica: '',
+    quickReplies: ['Sim', 'Não'] },
+];
+
+const FLUXO_ACID_USU_INCONSCIENTE = [
+  { campo: 'situacao', label: 'Situação observada', fase: 'Avaliação clínica',
+    texto: 'Qual a situação observada?',
+    dica: 'Ex: "Desacordado, sem resposta verbal"' },
+  { campo: 'sinais_vitais', label: 'Sinais vitais', fase: 'Avaliação clínica', opcional: true,
+    texto: 'Foram aferidos os sinais vitais?',
+    dica: 'Ex: "PA 120/80, FC 80bpm" — ou Pular',
+    quickReplies: ['Não foram aferidos', 'Pular'] },
+];
+
+const FLUXO_ACID_USU_DESTINO = [
+  { campo: 'hospital_destino', label: 'Destino', fase: 'Destino',
+    texto: 'Qual o destino para atendimento médico?',
+    dica: 'Ex: "UPA Campo Limpo", "Hospital Geral de Pirajussara"' },
+];
+
+const FLUXO_ACID_USU_EQUIPE = [
+  { campo: 'equipe', label: 'Equipe', fase: 'Equipe',
+    texto: 'Qual a equipe que realizou o atendimento?',
+    dica: 'Formato: CARGO / NOME / RE\nEx: OTU / Francisco José / RE 266' },
+  { campo: 'samu_solicitado', label: 'SAMU?', fase: 'SAMU',
+    texto: 'O SAMU foi acionado?',
+    dica: '',
+    quickReplies: ['Sim', 'Não'] },
+];
+
+const FLUXO_ACID_USU_DESFECHO = [
+  { campo: 'cientes', label: 'Cientes', fase: 'Desfecho',
+    texto: 'Quem estava ciente da ocorrência?',
+    dica: 'Formato: CARGO / NOME / RE\nEx: ET / Rafael Rocha / RE 208' },
+  { campo: 'horario_finalizacao', label: 'Horário de finalização', fase: 'Desfecho',
+    texto: 'Qual o horário de finalização?',
+    dica: 'Ex: "15h20"' },
+  { campo: 'observacoes', label: 'Observações', fase: 'Desfecho', opcional: true,
+    texto: 'Há alguma observação adicional?',
+    dica: 'Ex: "Nenhuma" — ou Pular',
+    quickReplies: ['Pular'] },
+];
+
+// Acidente com Coletivo
+const FLUXO_ACID_COL_INICIAL = [
+  { campo: 'horario', label: 'Horário', fase: 'Dados da ocorrência',
+    texto: 'Por volta de que horário ocorreu o acidente?',
+    dica: 'Ex: "09h15"' },
+  { campo: 'local', label: 'Local', fase: 'Dados da ocorrência',
+    texto: 'Qual o local exato onde ocorreu?',
+    dica: 'Ex: "Saída da Plataforma 3, Av. das Nações, próximo ao terminal"' },
+  { campo: 'tipo_acidente', label: 'Tipo de acidente', fase: 'Dados da ocorrência',
+    texto: 'Qual o tipo de acidente?',
+    dica: '',
+    quickReplies: ['Colisão entre coletivos', 'Coletivo x veículo particular', 'Coletivo x moto', 'Coletivo x pedestre'] },
+  { campo: 'col1_linha', label: 'Linha do coletivo', fase: 'Dados do coletivo',
+    texto: 'Qual a linha do coletivo envolvido?',
+    dica: 'Ex: "6820/10 Terminal Santo Amaro"' },
+  { campo: 'col1_prefixo', label: 'Prefixo', fase: 'Dados do coletivo',
+    texto: 'Qual o prefixo do coletivo?',
+    dica: 'Ex: "942"' },
+  { campo: 'col1_placa', label: 'Placa', fase: 'Dados do coletivo', opcional: true,
+    texto: 'Qual a placa do coletivo?',
+    dica: 'Ex: "ABC-1234" — ou Pular',
+    quickReplies: ['Pular'] },
+  { campo: 'col1_operador', label: 'Nome do operador', fase: 'Dados do coletivo',
+    texto: 'Qual o nome do operador (motorista)?',
+    dica: 'Ex: "Carlos Souza"' },
+  { campo: 'col1_chapa', label: 'Chapa do operador', fase: 'Dados do coletivo',
+    texto: 'Qual a chapa do operador?',
+    dica: 'Ex: "2363"' },
+  { campo: 'segundo_veiculo', label: 'Segundo veículo', fase: 'Segundo veículo', opcional: true,
+    texto: 'Qual a descrição do segundo veículo envolvido?',
+    dica: 'Ex: "Veículo particular VW Gol, placa XYZ-5678" — ou Pular se não houver',
+    quickReplies: ['Pular'] },
+  { campo: 'ha_vitimas', label: 'Há vítimas?', fase: 'Vítimas',
+    texto: 'Há vítimas no acidente?',
+    dica: '',
+    quickReplies: ['Sim', 'Não'] },
+];
+
+const FLUXO_ACID_COL_VITIMAS = [
+  { campo: 'vitimas_descricao', label: 'Descrição das vítimas', fase: 'Vítimas',
+    texto: 'Descreva as vítimas e o estado delas:',
+    dica: 'Ex: "1 passageiro com dor no pescoço, consciente. Motorista sem ferimentos."' },
+  { campo: 'samu_solicitado', label: 'SAMU?', fase: 'SAMU',
+    texto: 'O SAMU foi acionado?',
+    dica: '',
+    quickReplies: ['Sim', 'Não'] },
+  { campo: 'pm_gcm', label: 'PM / GCM', fase: 'Autoridades',
+    texto: 'A Polícia Militar (PM) ou GCM foi acionada?',
+    dica: '',
+    quickReplies: ['PM acionada', 'GCM acionada', 'Ambas', 'Não foi necessário'] },
+];
+
+const FLUXO_ACID_COL_SEM_VITIMAS = [
+  { campo: 'samu_solicitado', label: 'SAMU?', fase: 'SAMU',
+    texto: 'O SAMU foi acionado?',
+    dica: '',
+    quickReplies: ['Sim', 'Não'] },
+  { campo: 'pm_gcm', label: 'PM / GCM', fase: 'Autoridades',
+    texto: 'A Polícia Militar (PM) ou GCM foi acionada?',
+    dica: '',
+    quickReplies: ['PM acionada', 'GCM acionada', 'Ambas', 'Não foi necessário'] },
+];
+
+const FLUXO_ACID_COL_DESFECHO = [
+  { campo: 'equipe', label: 'Equipe', fase: 'Equipe',
+    texto: 'Qual a equipe que realizou o atendimento?',
+    dica: 'Formato: CARGO / NOME / RE\nEx: OTU / Francisco José / RE 266' },
+  { campo: 'cientes', label: 'Cientes', fase: 'Desfecho',
+    texto: 'Quem estava ciente da ocorrência?',
+    dica: 'Formato: CARGO / NOME / RE\nEx: ET / Rafael Rocha / RE 208' },
+  { campo: 'horario_finalizacao', label: 'Horário de finalização', fase: 'Desfecho',
+    texto: 'Qual o horário de finalização?',
+    dica: 'Ex: "10h45"' },
+  { campo: 'observacoes', label: 'Observações', fase: 'Desfecho', opcional: true,
+    texto: 'Há alguma observação adicional?',
+    dica: 'Ex: "Boletim de Ocorrência registrado" — ou Pular',
+    quickReplies: ['Pular'] },
+];
+
+const FLUXOS = {
+  inicial: FLUXO_INICIAL,
+  consciente: FLUXO_CONSCIENTE,
+  destino: FLUXO_DESTINO,
+  recusa: FLUXO_RECUSA,
+  inconsciente: FLUXO_INCONSCIENTE,
+  equipe: FLUXO_EQUIPE,
+  pergunta_samu: FLUXO_PERGUNTA_SAMU,
+  samu: FLUXO_SAMU,
+  coletivo: FLUXO_COLETIVO,
+  desfecho: FLUXO_DESFECHO,
+  acid_usu_inicial: FLUXO_ACID_USU_INICIAL,
+  acid_usu_consciente: FLUXO_ACID_USU_CONSCIENTE,
+  acid_usu_inconsciente: FLUXO_ACID_USU_INCONSCIENTE,
+  acid_usu_destino: FLUXO_ACID_USU_DESTINO,
+  acid_usu_recusa: FLUXO_RECUSA,
+  acid_usu_equipe: FLUXO_ACID_USU_EQUIPE,
+  acid_usu_samu: FLUXO_SAMU,
+  acid_usu_desfecho: FLUXO_ACID_USU_DESFECHO,
+  acid_col_inicial: FLUXO_ACID_COL_INICIAL,
+  acid_col_vitimas: FLUXO_ACID_COL_VITIMAS,
+  acid_col_sem_vitimas: FLUXO_ACID_COL_SEM_VITIMAS,
+  acid_col_samu: FLUXO_SAMU,
+  acid_col_desfecho: FLUXO_ACID_COL_DESFECHO,
+};
+
+const TOTAL_ETAPAS = Object.values(FLUXOS).reduce((a, f) => a + f.length, 0);
+
+// ════════════════════════════════════════════════════════════
+// DEBOUNCE
+// ════════════════════════════════════════════════════════════
+var _ultimoEvento = 0;
+function podeDisparar() {
+  var agora = Date.now();
+  if (agora - _ultimoEvento < 250) return false;
+  _ultimoEvento = agora;
+  return true;
+}
+
+document.addEventListener('pointerup', function(e) {
+  var el = e.target.closest('[data-dyn]');
+  if (!el) return;
+  e.stopPropagation();
+  e.preventDefault();
+  var nodebounce = el.getAttribute('data-nodebounce');
+  if (!nodebounce && !podeDisparar()) return;
+  if (nodebounce) _ultimoEvento = Date.now();
+  var fn = el.getAttribute('data-dyn');
+  if (fn) {
+    try { eval(fn); } catch(err) { console.error('data-dyn err:', err); }
+  }
+}, { passive: false });
+
+var _ultimoBtn = 0;
+var _ultimoEnvio = 0;
+
+function exec(fn) {
+  var agora = Date.now();
+  if (agora - _ultimoBtn < 300) return;
+  _ultimoBtn = agora;
+  try { fn(); } catch(e) { console.error(e); }
+}
+
+function execEnviar() {
+  var agora = Date.now();
+  if (agora - _ultimoEnvio < 150) return;
+  _ultimoEnvio = agora;
+  enviarResposta();
+}
+
+// ════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ════════════════════════════════════════════════════════════
+const Estado = {
+  tipo: null,
+  fase: null,
+  etapa: 0,
+  dados: {},
+  relatorioAtual: '',
+  histSelecionado: null,
+  online: navigator.onLine,
+  fotos: [],
+};
+
+// ════════════════════════════════════════════════════════════
+// NAVEGAÇÃO
+// ════════════════════════════════════════════════════════════
+function mostrarTela(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+const TIPOS_CONFIG = {
+  mal_subito: {
+    titulo: 'Mal Súbito',
+    emoji: '🆘',
+    faseInicial: 'inicial',
+    bemVindo: '📋 Iniciando registro de Mal Súbito.\n\nResponderei algumas perguntas. Para campos opcionais, toque em Pular.',
+  },
+  acidente_usuario: {
+    titulo: 'Acidente com Usuário',
+    emoji: '🤕',
+    faseInicial: 'acid_usu_inicial',
+    bemVindo: '📋 Iniciando registro de Acidente com Usuário.\n\nResponderei algumas perguntas. Para campos opcionais, toque em Pular.',
+  },
+  acidente_coletivo: {
+    titulo: 'Acidente com Coletivo',
+    emoji: '🚌',
+    faseInicial: 'acid_col_inicial',
+    bemVindo: '📋 Iniciando registro de Acidente com Coletivo.\n\nResponderei algumas perguntas. Para campos opcionais, toque em Pular.',
+  },
+};
+
+function iniciarOcorrencia(tipo) {
+  console.log("iniciarOcorrencia chamada:", tipo);
+  tipo = tipo || 'mal_subito';
+  const cfg = carregarConfig();
+  if (!cfg.groqKey && Estado.online) {
+    alert('Configure sua chave da API Groq em Configurações antes de continuar.');
+    mostrarTela('screen-config');
+    return;
+  }
+  const tipoCfg = TIPOS_CONFIG[tipo];
+  Estado.tipo = tipo;
+  Estado.fase = tipoCfg.faseInicial;
+  Estado.etapa = 0;
+  Estado.dados = {};
+  Estado.relatorioAtual = '';
+  Estado.fotos = [];
+  if (document.getElementById('fotos-grid')) {
+    document.getElementById('fotos-grid').innerHTML = '<div class="foto-add" data-action="btn-adicionar-foto"><div style="font-size:32px">📷</div><div style="font-size:13px;margin-top:6px;color:var(--text2)">Câmera ou galeria</div></div>';
+  }
+  if (cfg.terminal) Estado.dados.terminal = cfg.terminal;
+  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('chat-tipo-titulo').textContent = tipoCfg.titulo;
+  mostrarTela('screen-chat');
+  adicionarMsgBot(tipoCfg.bemVindo);
+  setTimeout(() => proximaPergunta(), 600);
+}
+
+function confirmarCancelar() {
+  if (confirm('Cancelar o registro atual?')) {
+    mostrarTela('screen-home');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// CHAT
+// ════════════════════════════════════════════════════════════
+function adicionarMsgBot(texto) {
+  const div = document.createElement('div');
+  div.className = 'msg msg-bot';
+  div.textContent = texto;
+  document.getElementById('chat-messages').appendChild(div);
+  scrollChat();
+}
+
+function adicionarMsgUsuario(texto) {
+  const div = document.createElement('div');
+  div.className = 'msg msg-user';
+  div.textContent = texto;
+  document.getElementById('chat-messages').appendChild(div);
+  scrollChat();
+}
+
+function adicionarMsgSistema(texto) {
+  const div = document.createElement('div');
+  div.className = 'msg msg-system';
+  div.textContent = texto;
+  document.getElementById('chat-messages').appendChild(div);
+  scrollChat();
+}
+
+function mostrarDigitando() {
+  const div = document.createElement('div');
+  div.className = 'msg msg-typing';
+  div.id = 'typing-indicator';
+  div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  document.getElementById('chat-messages').appendChild(div);
+  scrollChat();
+}
+
+function removerDigitando() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+function scrollChat() {
+  const c = document.getElementById('chat-messages');
+  setTimeout(() => c.scrollTop = c.scrollHeight, 50);
+}
+
+function setQuickReplies(opcoes) {
+  const wrap = document.getElementById('quick-replies');
+  wrap.innerHTML = '';
+  (opcoes || []).forEach(op => {
+    const btn = document.createElement('button');
+    btn.className = 'qr-btn';
+    btn.textContent = op;
+    if (op === 'Pular') {
+      btn.setAttribute('data-dyn', 'exec(pularCampo)');
+    } else {
+      btn.setAttribute('data-dyn', 'qrResponder(' + JSON.stringify(op) + ')');
+    }
+    wrap.appendChild(btn);
+  });
+}
+
+function qrResponder(valor) {
+  document.getElementById('chat-input').value = valor;
+  enviarResposta();
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+// ════════════════════════════════════════════════════════════
+// FLUXO PRINCIPAL
+// ════════════════════════════════════════════════════════════
+function getFluxoAtual() {
+  return FLUXOS[Estado.fase] || null;
+}
+
+function getPerguntaAtual() {
+  const fluxo = getFluxoAtual();
+  return fluxo ? fluxo[Estado.etapa] : null;
+}
+
+function getTexto(pergunta) {
+  return typeof pergunta.texto === 'function' ? pergunta.texto(Estado.dados) : pergunta.texto;
+}
+
+function proximaPergunta() {
+  const fluxo = getFluxoAtual();
+  if (fluxo && Estado.etapa < fluxo.length) {
+    const p = fluxo[Estado.etapa];
+    const preenchidos = Object.keys(Estado.dados).length;
+    const pct = Math.min(Math.round((preenchidos / TOTAL_ETAPAS) * 100), 99);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('progress-fase').textContent = p.fase || '';
+    document.getElementById('chat-status').textContent = p.fase || '';
+    let msg = getTexto(p);
+    if (p.dica) msg += '\n\n📌 ' + p.dica;
+    if (p.opcional) msg += '\n💡 Campo opcional';
+    adicionarMsgBot(msg);
+    setQuickReplies(p.quickReplies || []);
+    document.getElementById('chat-input').focus();
+  } else {
+    proximaFase();
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// PROXIMA FASE - CORRIGIDA PARA TODOS OS TIPOS DE OCORRÊNCIA
+// ════════════════════════════════════════════════════════════
+function proximaFase() {
+  const fase = Estado.fase;
+  
+  // ─── MAL SÚBITO ───
+  if (fase === 'inicial') {
+    const cons = Estado.dados.consciente?.toLowerCase();
+    if (cons === 'sim') {
+      Estado.fase = 'consciente';
+    } else {
+      Estado.dados.samu_solicitado = 'sim';
+      Estado.fase = 'inconsciente';
+      adicionarMsgSistema('⚠️ Usuário inconsciente — SAMU será acionado automaticamente');
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'consciente') {
+    const aceitou = Estado.dados.aceita_socorro?.toLowerCase();
+    if (aceitou === 'sim') {
+      Estado.fase = 'destino';
+    } else {
+      Estado.fase = 'recusa';
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'destino' || fase === 'recusa' || fase === 'inconsciente') {
+    Estado.fase = 'equipe';
+    Estado.etapa = 0;
+    const cfg = carregarConfig();
+    if (cfg.atendente && !Estado.dados.equipe) {
+      Estado.dados._equipe_sugerida = cfg.atendente;
+    }
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'equipe') {
+    const recusou = Estado.dados.aceita_socorro?.toLowerCase() === 'não' || Estado.dados.aceita_socorro?.toLowerCase() === 'nao';
+    if (recusou) {
+      Estado.fase = 'desfecho';
+    } else if (Estado.dados.samu_solicitado === 'sim') {
+      Estado.fase = 'samu';
+    } else {
+      Estado.fase = 'pergunta_samu';
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'pergunta_samu') {
+    const samu = Estado.dados.samu_solicitado?.toLowerCase();
+    Estado.fase = samu === 'sim' ? 'samu' : 'coletivo';
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'samu' || fase === 'coletivo') {
+    Estado.fase = 'desfecho';
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'desfecho') {
+    gerarRelatorio();
+    return;
+  }
+
+  // ─── ACIDENTE COM USUÁRIO ───
+  if (fase === 'acid_usu_inicial') {
+    const cons = Estado.dados.consciente?.toLowerCase();
+    if (cons === 'sim') {
+      Estado.fase = 'acid_usu_consciente';
+    } else {
+      Estado.dados.samu_solicitado = 'sim';
+      Estado.fase = 'acid_usu_inconsciente';
+      adicionarMsgSistema('⚠️ Usuário inconsciente — SAMU será acionado automaticamente');
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_usu_consciente') {
+    const aceitou = Estado.dados.aceita_socorro?.toLowerCase();
+    if (aceitou === 'sim') {
+      Estado.fase = 'acid_usu_destino';
+    } else {
+      Estado.fase = 'acid_usu_recusa';
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_usu_inconsciente') {
+    Estado.fase = 'acid_usu_equipe';
+    Estado.etapa = 0;
+    const cfg = carregarConfig();
+    if (cfg.atendente && !Estado.dados.equipe) {
+      Estado.dados._equipe_sugerida = cfg.atendente;
+    }
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_usu_destino' || fase === 'acid_usu_recusa') {
+    Estado.fase = 'acid_usu_equipe';
+    Estado.etapa = 0;
+    const cfg = carregarConfig();
+    if (cfg.atendente && !Estado.dados.equipe) {
+      Estado.dados._equipe_sugerida = cfg.atendente;
+    }
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_usu_equipe') {
+    const recusou = Estado.dados.aceita_socorro?.toLowerCase() === 'não' || Estado.dados.aceita_socorro?.toLowerCase() === 'nao';
+    if (recusou) {
+      Estado.fase = 'acid_usu_desfecho';
+    } else if (Estado.dados.samu_solicitado?.toLowerCase() === 'sim') {
+      Estado.fase = 'acid_usu_samu';
+    } else {
+      Estado.fase = 'acid_usu_desfecho';
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_usu_samu') {
+    Estado.fase = 'acid_usu_desfecho';
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_usu_desfecho') {
+    gerarRelatorio();
+    return;
+  }
+
+  // ─── ACIDENTE COM COLETIVO ───
+  if (fase === 'acid_col_inicial') {
+    const vitimas = Estado.dados.ha_vitimas?.toLowerCase();
+    if (vitimas === 'sim') {
+      Estado.fase = 'acid_col_vitimas';
+    } else {
+      Estado.fase = 'acid_col_sem_vitimas';
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_col_vitimas' || fase === 'acid_col_sem_vitimas') {
+    if (Estado.dados.samu_solicitado?.toLowerCase() === 'sim') {
+      Estado.fase = 'acid_col_samu';
+    } else {
+      Estado.fase = 'acid_col_desfecho';
+    }
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_col_samu') {
+    Estado.fase = 'acid_col_desfecho';
+    Estado.etapa = 0;
+    proximaPergunta();
+    return;
+  }
+  
+  if (fase === 'acid_col_desfecho') {
+    gerarRelatorio();
+    return;
+  }
+
+  // Fallback
+  console.warn('Fase não reconhecida:', fase);
+  Estado.fase = 'desfecho';
+  Estado.etapa = 0;
+  proximaPergunta();
+}
+
+function pularCampo() {
+  var p = getPerguntaAtual();
+  if (!p) return;
+  if (p.opcional) {
+    adicionarMsgUsuario('Pular');
+    Estado.etapa++;
+    setTimeout(function() { proximaPergunta(); }, 200);
+  } else {
+    adicionarMsgBot('⚠️ Este campo é obrigatório. Por favor, responda.');
+  }
+}
+
+function enviarResposta() {
+  var input = document.getElementById('chat-input');
+  var texto = input.value.trim();
+  if (!texto) return;
+  input.value = '';
+  input.style.height = 'auto';
+  input.blur();
+
+  var p = getPerguntaAtual();
+  if (!p) return;
+
+  setQuickReplies([]);
+  adicionarMsgUsuario(texto);
+  Estado.dados[p.campo] = texto;
+  Estado.etapa++;
+  setTimeout(function() { proximaPergunta(); }, 200);
+}
+
+// ════════════════════════════════════════════════════════════
+// GERAÇÃO DO RELATÓRIO
+// ════════════════════════════════════════════════════════════
+function montarContextoMalSubito() {
+  const d = Estado.dados;
+  const L = [];
+  L.push('DADOS DA OCORRENCIA');
+  if (d.terminal) L.push(`Terminal: ${d.terminal}`);
+  if (d.horario) L.push(`Horário: ${d.horario}`);
+  if (d.local) L.push(`Local: ${d.local}`);
+  L.push('\nDADOS DO USUARIO');
+  if (d.usuario_nome) L.push(`Nome: ${d.usuario_nome}`);
+  if (d.idade) L.push(`Idade: ${d.idade}`);
+  if (d.usuario_rg) L.push(`RG: ${d.usuario_rg}`);
+  if (d.usuario_cpf) L.push(`CPF: ${d.usuario_cpf}`);
+  L.push('\nESTADO CLINICO');
+  const cons = d.consciente?.toLowerCase();
+  L.push(`Consciente: ${cons === 'sim' ? 'Sim' : 'Não — usuário inconsciente'}`);
+  if (d.situacao) L.push(`Sintomas: ${d.situacao}`);
+  if (d.info_adicional) L.push(`Info adicional: ${d.info_adicional}`);
+  if (d.nivel_consciencia) L.push(`Nível de consciência: ${d.nivel_consciencia}`);
+  if (d.sinais_vitais) L.push(`Sinais vitais: ${d.sinais_vitais}`);
+  else L.push('Sinais vitais: não aferidos');
+  if (d.cadeira_rodas) L.push(`Cadeira de rodas: ${d.cadeira_rodas}`);
+  if (d.aceita_socorro) L.push(`Aceitou condução: ${d.aceita_socorro}`);
+  if (d.recusa_confirmada) L.push('Recusa formalizada: termo de recusa assinado pelo usuário');
+  if (d.hospital_destino) L.push(`Destino: ${d.hospital_destino}`);
+  L.push('\nEQUIPE');
+  if (d.equipe) L.push(d.equipe);
+  const recusou = d.aceita_socorro?.toLowerCase() === 'não' || d.aceita_socorro?.toLowerCase() === 'nao';
+  if (!recusou) {
+    L.push('\nSAMU');
+    if (d.samu_solicitado?.toLowerCase() === 'sim') {
+      L.push('SAMU: Sim');
+      if (d.samu_horario_contato) L.push(`Contato: ${d.samu_horario_contato}`);
+      if (d.samu_atendente) L.push(`Atendente: ${d.samu_atendente}`);
+      if (d.samu_protocolo) L.push(`Protocolo: ${d.samu_protocolo}`);
+      if (d.samu_horario_chegada) L.push(`Chegada: ${d.samu_horario_chegada}`);
+      if (d.samu_horario_saida) L.push(`Saída: ${d.samu_horario_saida}`);
+      if (d.samu_placa) L.push(`Placa: ${d.samu_placa}`);
+      if (d.samu_prefixo) L.push(`Prefixo: ${d.samu_prefixo}`);
+      if (d.samu_equipe) L.push(`Equipe SAMU: ${d.samu_equipe}`);
+    } else {
+      L.push('SAMU: Não');
+      if (d.coletivo_linha) L.push(`Linha: ${d.coletivo_linha}`);
+      if (d.coletivo_motorista) L.push(`Motorista: ${d.coletivo_motorista}`);
+      if (d.coletivo_cobrador) L.push(`Cobrador: ${d.coletivo_cobrador}`);
+    }
+  }
+  L.push('\nDESFECHO');
+  if (d.cientes) L.push(`Cientes: ${d.cientes}`);
+  if (d.horario_finalizacao) L.push(`Finalização: ${d.horario_finalizacao}`);
+  if (d.observacoes) L.push(`Observações: ${d.observacoes}`);
+  return L.join('\n');
+}
+
+function montarContextoAcidenteUsuario() {
+  const d = Estado.dados;
+  const L = [];
+  L.push('ACIDENTE COM USUARIO');
+  if (d.terminal) L.push(`Terminal: ${d.terminal}`);
+  if (d.horario) L.push(`Horário: ${d.horario}`);
+  if (d.local) L.push(`Local: ${d.local}`);
+  if (d.como_aconteceu) L.push(`Como aconteceu: ${d.como_aconteceu}`);
+  L.push('\nDADOS DO USUARIO');
+  if (d.usuario_nome) L.push(`Nome: ${d.usuario_nome}`);
+  if (d.idade) L.push(`Idade: ${d.idade}`);
+  if (d.usuario_rg) L.push(`RG: ${d.usuario_rg}`);
+  if (d.usuario_cpf) L.push(`CPF: ${d.usuario_cpf}`);
+  L.push('\nESTADO CLINICO');
+  const cons = d.consciente?.toLowerCase();
+  L.push(`Consciente: ${cons === 'sim' ? 'Sim' : 'Não — inconsciente'}`);
+  if (d.situacao) L.push(`Lesões / queixas: ${d.situacao}`);
+  if (d.sinais_vitais) L.push(`Sinais vitais: ${d.sinais_vitais}`);
+  else L.push('Sinais vitais: não aferidos');
+  if (d.aceita_socorro) L.push(`Aceitou atendimento: ${d.aceita_socorro}`);
+  if (d.recusa_confirmada) L.push('Recusa formalizada: termo assinado pelo usuário');
+  if (d.hospital_destino) L.push(`Destino: ${d.hospital_destino}`);
+  L.push('\nEQUIPE');
+  if (d.equipe) L.push(d.equipe);
+  L.push('\nSAMU');
+  if (d.samu_solicitado?.toLowerCase() === 'sim') {
+    L.push('SAMU: Sim');
+    if (d.samu_horario_contato) L.push(`Contato: ${d.samu_horario_contato}`);
+    if (d.samu_atendente) L.push(`Atendente: ${d.samu_atendente}`);
+    if (d.samu_protocolo) L.push(`Protocolo: ${d.samu_protocolo}`);
+    if (d.samu_horario_chegada) L.push(`Chegada: ${d.samu_horario_chegada}`);
+    if (d.samu_horario_saida) L.push(`Saída: ${d.samu_horario_saida}`);
+    if (d.samu_placa) L.push(`Placa: ${d.samu_placa}`);
+    if (d.samu_prefixo) L.push(`Prefixo: ${d.samu_prefixo}`);
+    if (d.samu_equipe) L.push(`Equipe SAMU: ${d.samu_equipe}`);
+  } else { L.push('SAMU: Não'); }
+  L.push('\nDESFECHO');
+  if (d.cientes) L.push(`Cientes: ${d.cientes}`);
+  if (d.horario_finalizacao) L.push(`Finalização: ${d.horario_finalizacao}`);
+  if (d.observacoes) L.push(`Observações: ${d.observacoes}`);
+  return L.join('\n');
+}
+
+function montarContextoAcidenteColetivo() {
+  const d = Estado.dados;
+  const L = [];
+  L.push('ACIDENTE COM COLETIVO');
+  if (d.terminal) L.push(`Terminal: ${d.terminal}`);
+  if (d.horario) L.push(`Horário: ${d.horario}`);
+  if (d.local) L.push(`Local: ${d.local}`);
+  if (d.tipo_acidente) L.push(`Tipo: ${d.tipo_acidente}`);
+  L.push('\nCOLETIVO');
+  if (d.col1_linha) L.push(`Linha: ${d.col1_linha}`);
+  if (d.col1_prefixo) L.push(`Prefixo: ${d.col1_prefixo}`);
+  if (d.col1_placa) L.push(`Placa: ${d.col1_placa}`);
+  if (d.col1_operador) L.push(`Operador: ${d.col1_operador}`);
+  if (d.col1_chapa) L.push(`Chapa: ${d.col1_chapa}`);
+  if (d.segundo_veiculo) L.push(`Segundo veículo: ${d.segundo_veiculo}`);
+  L.push('\nVITIMAS');
+  L.push(`Há vítimas: ${d.ha_vitimas}`);
+  if (d.vitimas_descricao) L.push(`Descrição: ${d.vitimas_descricao}`);
+  L.push('\nAUTORIDADES');
+  if (d.pm_gcm) L.push(`PM/GCM: ${d.pm_gcm}`);
+  L.push('\nSAMU');
+  if (d.samu_solicitado?.toLowerCase() === 'sim') {
+    L.push('SAMU: Sim');
+    if (d.samu_horario_contato) L.push(`Contato: ${d.samu_horario_contato}`);
+    if (d.samu_atendente) L.push(`Atendente: ${d.samu_atendente}`);
+    if (d.samu_protocolo) L.push(`Protocolo: ${d.samu_protocolo}`);
+    if (d.samu_horario_chegada) L.push(`Chegada: ${d.samu_horario_chegada}`);
+    if (d.samu_horario_saida) L.push(`Saída: ${d.samu_horario_saida}`);
+    if (d.samu_placa) L.push(`Placa SAMU: ${d.samu_placa}`);
+    if (d.samu_prefixo) L.push(`Prefixo SAMU: ${d.samu_prefixo}`);
+    if (d.samu_equipe) L.push(`Equipe SAMU: ${d.samu_equipe}`);
+  } else { L.push('SAMU: Não'); }
+  L.push('\nEQUIPE E DESFECHO');
+  if (d.equipe) L.push(`Equipe OTU: ${d.equipe}`);
+  if (d.cientes) L.push(`Cientes: ${d.cientes}`);
+  if (d.horario_finalizacao) L.push(`Finalização: ${d.horario_finalizacao}`);
+  if (d.observacoes) L.push(`Observações: ${d.observacoes}`);
+  return L.join('\n');
+}
+
+function montarContexto() {
+  const tipo = Estado.tipo || 'mal_subito';
+  if (tipo === 'acidente_usuario') return montarContextoAcidenteUsuario();
+  if (tipo === 'acidente_coletivo') return montarContextoAcidenteColetivo();
+  return montarContextoMalSubito();
+}
+
+function modeloTemplateOffline() {
+  const tipo = Estado.tipo || 'mal_subito';
+  if (tipo === 'acidente_usuario') return modeloTemplateAU();
+  if (tipo === 'acidente_coletivo') return modeloTemplateAC();
+  return modeloTemplateMS();
+}
+
+function modeloTemplateAU() {
+  const d = Estado.dados;
+  let txt = `Venho informar que por volta das ${d.horario || '[horário]'}, ocorreu um acidente envolvendo usuário`;
+  txt += ` no ${d.terminal || '[terminal]'}${d.local ? ', ' + d.local : ''}.`;
+  if (d.como_aconteceu) txt += ` ${d.como_aconteceu}.`;
+  txt += ` O(a) usuário(a) ${d.usuario_nome || 'não identificado(a)'}`;
+  if (d.idade) txt += `, de ${d.idade}`;
+  const docs = [];
+  if (d.usuario_rg) docs.push('RG nº ' + d.usuario_rg);
+  if (d.usuario_cpf) docs.push('CPF nº ' + d.usuario_cpf);
+  if (docs.length) txt += `, portador(a) do ${docs.join(' e ')}`;
+  txt += `, encontrava-se ${d.consciente?.toLowerCase() === 'sim' ? 'consciente' : 'inconsciente'}.`;
+  if (d.lesoes) txt += ` Foram observadas: ${d.lesoes}.`;
+  if (d.sinais_vitais) txt += ` Sinais vitais: ${d.sinais_vitais}.`;
+  if (d.equipe) txt += ` O atendimento foi realizado pela equipe: ${d.equipe.replace(/\n/g, ', ')}.`;
+  if (d.samu_solicitado?.toLowerCase() === 'sim') {
+    txt += ' O SAMU foi acionado';
+    if (d.samu_protocolo) txt += `, protocolo nº ${d.samu_protocolo}`;
+    txt += '.';
+  }
+  if (d.hospital_destino) txt += ` O(a) usuário(a) foi conduzido(a) à ${d.hospital_destino}.`;
+  txt += ` Ocorrência finalizada às ${d.horario_finalizacao || '[horário]'}.`;
+  if (d.cientes) txt += ` Cientes: ${d.cientes.replace(/\n/g, ', ')}.`;
+  return txt;
+}
+
+function modeloTemplateAC() {
+  const d = Estado.dados;
+  let txt = `Venho informar que por volta das ${d.horario || '[horário]'}, ocorreu um acidente de trânsito`;
+  txt += ` no ${d.terminal || '[terminal]'}${d.local ? ', ' + d.local : ''}.`;
+  if (d.tipo_acidente) txt += ` Tipo: ${d.tipo_acidente}.`;
+  if (d.coletivo1_linha) txt += ` Coletivo envolvido: linha ${d.coletivo1_linha}, prefixo ${d.coletivo1_prefixo || '[prefixo]'}, operador ${d.coletivo1_operador || '[operador]'}, chapa ${d.coletivo1_chapa || '[chapa]'}.`;
+  if (d.segundo_veiculo) txt += ` Segundo veículo: ${d.segundo_veiculo}.`;
+  if (d.ha_vitimas?.toLowerCase() === 'sim') {
+    txt += ' Houve vítimas.';
+    if (d.vitimas_descricao) txt += ` ${d.vitimas_descricao}.`;
+    if (d.samu_solicitado?.toLowerCase() === 'sim') {
+      txt += ' O SAMU foi acionado';
+      if (d.samu_protocolo) txt += `, protocolo nº ${d.samu_protocolo}`;
+      txt += '.';
+    }
+    if (d.pm_gcm) txt += ` ${d.pm_gcm}.`;
+    if (d.bo_numero) txt += ` ${d.bo_numero}.`;
+  } else {
+    txt += ' Não houve vítimas.';
+  }
+  if (d.equipe) txt += ` Equipe de atendimento: ${d.equipe.replace(/\n/g, ', ')}.`;
+  txt += ` Ocorrência finalizada às ${d.horario_finalizacao || '[horário]'}.`;
+  if (d.cientes) txt += ` Cientes: ${d.cientes.replace(/\n/g, ', ')}.`;
+  return txt;
+}
+
+function modeloTemplateMS() {
+  const d = Estado.dados;
+  const cons = d.consciente?.toLowerCase() === 'sim';
+  const recusou = d.aceita_socorro?.toLowerCase() === 'não' || d.aceita_socorro?.toLowerCase() === 'nao';
+  const samuSim = d.samu_solicitado?.toLowerCase() === 'sim';
+  let txt = `Venho informar que por volta das ${d.horario || '[horário]'}, foi registrada uma ocorrência`;
+  txt += ` no ${d.terminal || '[terminal]'}${d.local ? ', ' + d.local : ''}`;
+  txt += `, envolvendo o(a) usuário(a) ${d.usuario_nome || 'não identificado(a)'}`;
+  if (d.idade) txt += `, de ${d.idade}`;
+  const docs = [];
+  if (d.usuario_rg) docs.push(`RG nº ${d.usuario_rg}`);
+  if (d.usuario_cpf) docs.push(`CPF nº ${d.usuario_cpf}`);
+  if (docs.length) txt += `, portador(a) do ${docs.join(' e ')}`;
+  txt += '.';
+  if (cons) {
+    txt += ` O(a) usuário(a) encontrava-se consciente${d.nivel_consciencia ? ' e ' + d.nivel_consciencia : ''}`;
+    if (d.situacao) txt += `, relatando ${d.situacao}`;
+    if (d.info_adicional) txt += `, tendo informado que ${d.info_adicional}`;
+    txt += '.';
+    if (d.sinais_vitais) txt += ` Sinais vitais: ${d.sinais_vitais}.`;
+    else txt += ' Os sinais vitais não foram aferidos.';
+    if (d.cadeira_rodas?.toLowerCase() === 'sim') txt += ' Foi utilizada cadeira de rodas para auxiliar o(a) usuário(a).';
+    if (recusou) {
+      txt += ` O(a) usuário(a) recusou ser conduzido(a) para atendimento médico. Diante da recusa, foi colhida a assinatura do Termo de Recusa como comprovação do atendimento oferecido.`;
+    } else {
+      txt += ` O(a) usuário(a) aceitou ser conduzido(a) para atendimento médico${d.hospital_destino ? ' na ' + d.hospital_destino : ''}.`;
+    }
+  } else {
+    txt += ` O(a) usuário(a) encontrava-se inconsciente`;
+    if (d.situacao) txt += `, sendo observado(a): ${d.situacao}`;
+    txt += '.';
+    if (d.sinais_vitais) txt += ` Sinais vitais: ${d.sinais_vitais}.`;
+    else txt += ' Os sinais vitais não foram aferidos.';
+  }
+  if (d.equipe) {
+    txt += ` O atendimento foi realizado pela equipe: ${d.equipe.replace(/\n/g, ', ')}.`;
+  }
+  if (!recusou) {
+    if (samuSim) {
+      txt += ` O SAMU foi acionado`;
+      if (d.samu_horario_contato) txt += ` às ${d.samu_horario_contato}`;
+      if (d.samu_atendente) txt += `, com a atendente ${d.samu_atendente}`;
+      if (d.samu_protocolo) txt += `, protocolo nº ${d.samu_protocolo}`;
+      txt += '.';
+      if (d.samu_horario_chegada) txt += ` A viatura chegou ao local às ${d.samu_horario_chegada}`;
+      if (d.samu_horario_saida) txt += ` e partiu às ${d.samu_horario_saida}`;
+      if (d.samu_placa) txt += `, placa ${d.samu_placa}`;
+      if (d.samu_prefixo) txt += `, prefixo ${d.samu_prefixo}`;
+      txt += '.';
+      if (d.samu_equipe) txt += ` Equipe do SAMU: ${d.samu_equipe.replace(/\n/g, ', ')}.`;
+    } else if (d.coletivo_linha) {
+      txt += ` O(a) usuário(a) foi conduzido(a) pela ${d.coletivo_linha}`;
+      if (d.coletivo_motorista) txt += `, motorista ${d.coletivo_motorista}`;
+      if (d.coletivo_cobrador) txt += `, cobrador ${d.coletivo_cobrador}`;
+      txt += '.';
+    }
+  }
+  txt += ` A ocorrência foi finalizada às ${d.horario_finalizacao || '[horário]'}.`;
+  if (d.observacoes) txt += ` ${d.observacoes}.`;
+  if (d.cientes) txt += ` Cientes: ${d.cientes.replace(/\n/g, ', ')}.`;
+  return txt;
+}
+
+async function gerarRelatorio() {
+  adicionarMsgSistema('⏳ Gerando relatório...');
+  mostrarDigitando();
+  document.getElementById('chat-send').disabled = true;
+
+  const cfg = carregarConfig();
+  let relatorio = '';
+
+  const tipo = Estado.tipo || 'mal_subito';
+  const contexto = montarContexto();
+  const d = Estado.dados;
+
+  if (!Estado.online || !cfg.groqKey) {
+    await new Promise(r => setTimeout(r, 800));
+    removerDigitando();
+    relatorio = modeloTemplateOffline();
+    if (!Estado.online) adicionarMsgSistema('📵 Gerado em modo offline (sem IA)');
+  } else {
+    try {
+      const inconsciente = d.consciente?.toLowerCase() !== 'sim';
+      const recusou = d.aceita_socorro?.toLowerCase() === 'não' || d.aceita_socorro?.toLowerCase() === 'nao';
+
+      let instrucaoTipo = '';
+      if (tipo === 'mal_subito') {
+        instrucaoTipo = inconsciente
+          ? 'ATENÇÃO — VÍTIMA INCONSCIENTE: Use "encontrava-se inconsciente". NUNCA mencione cadeira de rodas nem que aceitou/recusou. SAMU acionado automaticamente.'
+          : recusou
+          ? 'ATENÇÃO — VÍTIMA RECUSOU: Mencione que recusou e que foi colhida assinatura do Termo de Recusa. NÃO mencione SAMU, hospital ou coletivo.'
+          : 'ATENÇÃO — VÍTIMA CONSCIENTE: Descreva sintomas. Mencione cadeira de rodas SOMENTE se constar nos dados.';
+      } else if (tipo === 'acidente_usuario') {
+        instrucaoTipo = 'Redija um relatório de ACIDENTE COM USUÁRIO. Descreva como o acidente ocorreu, as lesões, o atendimento prestado e o desfecho. Linguagem formal e objetiva.';
+      } else if (tipo === 'acidente_coletivo') {
+        instrucaoTipo = 'Redija um relatório de ACIDENTE COM COLETIVO. Descreva os veículos envolvidos, as vítimas se houver, o acionamento de PM/GCM e SAMU se aplicável, e o desfecho. Linguagem formal e objetiva.';
+      }
+
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cfg.groqKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.1,
+          max_tokens: 1500,
+          messages: [{
+            role: 'user',
+            content: `Você é um redator técnico especializado em relatórios operacionais de terminais de ônibus urbanos em São Paulo.
+
+Redija um relatório formal em texto corrido, linguagem formal, técnica, terceira pessoa.
+
+REGRAS:
+1. Use SOMENTE as informações dos DADOS fornecidos. Nunca invente.
+2. Inclua RG e CPF quando fornecidos: "portador(a) do RG nº [RG] e CPF nº [CPF]".
+3. Nunca escreva "não informado" — omita o dado ou reescreva a frase de forma fluida.
+4. Texto corrido e coeso, sem listas ou títulos.
+5. Retorne APENAS o texto do relatório.
+${instrucaoTipo}
+
+DADOS:
+${contexto}`
+          }]
+        })
+      });
+
+      if (!resp.ok) throw new Error('Erro API ' + resp.status);
+      const json = await resp.json();
+      relatorio = json.choices[0].message.content.trim();
+      removerDigitando();
+    } catch (e) {
+      console.error('Erro gerarRelatorio:', e);
+      removerDigitando();
+      relatorio = modeloTemplateOffline();
+      adicionarMsgSistema('⚠️ Erro na API — relatório gerado pelo template local');
+    }
+  }
+
+  Estado.relatorioAtual = relatorio;
+  document.getElementById('chat-send').disabled = false;
+  document.getElementById('report-text').textContent = relatorio;
+  mostrarTela('screen-relatorio');
+}
+
+// ════════════════════════════════════════════════════════════
+// CORREÇÃO
+// ════════════════════════════════════════════════════════════
+function abrirCorrecao() {
+  document.getElementById('correcao-input').value = '';
+  abrirModal('modal-correcao');
+}
+
+async function aplicarCorrecao() {
+  const instrucao = document.getElementById('correcao-input').value.trim();
+  if (!instrucao) return;
+  fecharModal('modal-correcao');
+
+  const cfg = carregarConfig();
+  if (!cfg.groqKey || !Estado.online) {
+    alert('Correção com IA requer conexão e chave da API configurada.');
+    return;
+  }
+
+  document.getElementById('report-text').textContent = '⏳ Aplicando correção...';
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.groqKey}` },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.1,
+        max_tokens: 1500,
+        messages: [
+          { role: 'system', content: 'Você corrige relatórios formais. Reescreva o relatório completo aplicando a correção. Nunca escreva "não informado". Retorne APENAS o texto corrigido.' },
+          { role: 'assistant', content: Estado.relatorioAtual },
+          { role: 'user', content: 'Corrija: ' + instrucao },
+        ]
+      })
+    });
+    const json = await resp.json();
+    Estado.relatorioAtual = json.choices[0].message.content.trim();
+    document.getElementById('report-text').textContent = Estado.relatorioAtual;
+  } catch (e) {
+    document.getElementById('report-text').textContent = Estado.relatorioAtual;
+    alert('Erro ao aplicar correção.');
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// FOTOS
+// ════════════════════════════════════════════════════════════
+function adicionarFoto() {
+  if (Estado.fotos.length >= 2) {
+    alert('Máximo de 2 fotos por ocorrência.');
+    return;
+  }
+  abrirModal('modal-foto-opcao');
+}
+
+function abrirCamera() {
+  fecharModal('modal-foto-opcao');
+  document.getElementById('foto-input-camera').click();
+}
+
+function abrirGaleria() {
+  fecharModal('modal-foto-opcao');
+  document.getElementById('foto-input-galeria').click();
+}
+
+function onFotoSelecionada(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    Estado.fotos.push(e.target.result);
+    renderizarFotos();
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function renderizarFotos() {
+  const grid = document.getElementById('fotos-grid');
+  grid.innerHTML = '';
+  Estado.fotos.forEach((src, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'foto-wrap';
+    wrap.innerHTML = `<img class="foto-thumb" src="${src}">
+      <button class="foto-del" data-action="btn-remover-foto-${idx}" data-dyn="removerFoto(${idx})">×</button>`;
+    grid.appendChild(wrap);
+  });
+  if (Estado.fotos.length < 2) {
+    const btn = document.createElement('div');
+    btn.className = 'foto-add';
+    btn.id = 'foto-add-btn';
+    btn.setAttribute('data-action', 'btn-adicionar-foto');
+    btn.innerHTML = '<div style="font-size:32px">📷</div><div style="font-size:13px;margin-top:6px;color:var(--text2)">Adicionar foto</div>';
+    grid.appendChild(btn);
+  }
+}
+
+function removerFoto(idx) {
+  Estado.fotos.splice(idx, 1);
+  renderizarFotos();
+}
+
+// ════════════════════════════════════════════════════════════
+// PDF
+// ════════════════════════════════════════════════════════════
+function montarDocPDF(texto, nomeArquivo, fotos, d) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('RELATORIO DE OCORRENCIA', 105, 18, { align: 'center' });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
+  doc.text(`Terminal: ${d.terminal || '-'}   Data: ${new Date().toLocaleDateString('pt-BR')}   Hora: ${d.horario || '-'}`, 105, 25, { align: 'center' });
+  doc.setTextColor(0);
+  doc.setFontSize(10);
+  const textoLimpo = texto.replace(/[\u0100-\uFFFF]/g, (c) => c.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  const linhas = doc.splitTextToSize(textoLimpo, 175);
+  doc.text(linhas, 17, 35);
+  const fotosArr = fotos || [];
+  if (fotosArr.length > 0) {
+    doc.addPage();
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+    doc.text('FOTOS DA OCORRENCIA', 105, 20, { align: 'center' });
+    let yPos = 30;
+    fotosArr.forEach((src, idx) => {
+      try {
+        const fmt = src.includes('png') ? 'PNG' : 'JPEG';
+        doc.addImage(src, fmt, 17, yPos, 80, 80);
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+        doc.text(`Foto ${idx + 1}`, 57, yPos + 84, { align: 'center' });
+        yPos += 95;
+      } catch(e) {}
+    });
+  }
+  const totalPags = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPags; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text(`Pagina ${i} de ${totalPags}`, 105, 290, { align: 'center' });
+  }
+  return doc;
+}
+
+async function gerarPDF(texto, nomeArquivo, fotos) {
+  const d = Estado.dados;
+  const doc = montarDocPDF(texto, nomeArquivo, fotos || Estado.fotos || [], d);
+  const base64 = doc.output('datauristring').split(',')[1];
+  const fileName = nomeArquivo || `relatorio_${Date.now()}.pdf`;
+
+  if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+    try {
+      const { Filesystem, Directory } = await import('https://esm.sh/@capacitor/filesystem@6');
+      const { Share } = await import('https://esm.sh/@capacitor/share@6');
+
+      await Filesystem.writeFile({
+        path: fileName,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      const fileUri = await Filesystem.getUri({
+        path: fileName,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title: 'Relatório de Ocorrência',
+        url: fileUri.uri,
+        dialogTitle: 'Abrir ou compartilhar PDF',
+      });
+      return;
+    } catch(e) {
+      console.error('Erro Capacitor PDF:', e);
+    }
+  }
+
+  try {
+    const pdfBlob = doc.output('blob');
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch(e) {
+    doc.save(fileName);
+  }
+}
+
+function exportarPDF() { gerarPDF(Estado.relatorioAtual, `ocorrencia_${Date.now()}.pdf`, Estado.fotos); }
+function exportarPDFHist() { if (Estado.histSelecionado) gerarPDF(Estado.histSelecionado.relatorio, `ocorrencia_${Estado.histSelecionado.id}.pdf`, Estado.histSelecionado.fotos || []); }
+
+// ════════════════════════════════════════════════════════════
+// WHATSAPP
+// ════════════════════════════════════════════════════════════
+function compartilharWhatsApp() {
+  const tipoTxt = {'mal_subito':'Mal Súbito','acidente_usuario':'Acidente com Usuário','acidente_coletivo':'Acidente com Coletivo'}[Estado.tipo] || 'Ocorrência';
+  const texto = encodeURIComponent(`📋 *Relatório de Ocorrência — ${tipoTxt}*\n\n` + Estado.relatorioAtual);
+  window.open(`https://wa.me/?text=${texto}`, '_blank');
+}
+function compartilharWhatsAppHist() {
+  if (!Estado.histSelecionado) return;
+  const texto = encodeURIComponent('📋 *Relatório de Ocorrência*\n\n' + Estado.histSelecionado.relatorio);
+  window.open(`https://wa.me/?text=${texto}`, '_blank');
+}
+
+// ════════════════════════════════════════════════════════════
+// HISTÓRICO
+// ════════════════════════════════════════════════════════════
+function salvarOcorrencia() {
+  const ocorrencias = JSON.parse(localStorage.getItem('ocorrencias') || '[]');
+  const d = Estado.dados;
+  const nova = {
+    id: Date.now(),
+    data: new Date().toLocaleString('pt-BR'),
+    nome: d.usuario_nome || 'Não identificado',
+    local: d.local || '—',
+    terminal: d.terminal || '—',
+    horario: d.horario || '—',
+    consciente: d.consciente,
+    samu: d.samu_solicitado,
+    aceita: d.aceita_socorro,
+    relatorio: Estado.relatorioAtual,
+    fotos: Estado.fotos || [],
+    tipo: Estado.tipo || 'mal_subito',
+    tipoLabel: {'mal_subito':'🆘','acidente_usuario':'🤕','acidente_coletivo':'🚌'}[Estado.tipo] || '🆘',
+  };
+  ocorrencias.unshift(nova);
+  if (ocorrencias.length > 100) ocorrencias.pop();
+  localStorage.setItem('ocorrencias', JSON.stringify(ocorrencias));
+  alert('✅ Ocorrência salva no histórico!');
+}
+
+function carregarHistorico() {
+  const lista = JSON.parse(localStorage.getItem('ocorrencias') || '[]');
+  const el = document.getElementById('hist-list');
+  const count = document.getElementById('hist-count');
+  count.textContent = `${lista.length} registro${lista.length !== 1 ? 's' : ''}`;
+  el.innerHTML = '';
+  if (!lista.length) {
+    el.innerHTML = `<div class="hist-empty"><div class="hist-empty-icon">📋</div><div>Nenhuma ocorrência salva ainda.</div></div>`;
+    return;
+  }
+  lista.forEach(function(oc, idx) {
+    var div = document.createElement('div');
+    div.className = 'hist-item';
+    const cons = oc.consciente?.toLowerCase() === 'sim';
+    const samuTag = oc.samu?.toLowerCase() === 'sim' ? '<span class="hist-tag samu">SAMU</span>' : '';
+    const tipoTag = oc.tipo === 'acidente_usuario' ? '<span class="hist-tag" style="background:rgba(247,165,53,0.15);color:var(--warn)">🤕 Acidente usuário</span>'
+      : oc.tipo === 'acidente_coletivo' ? '<span class="hist-tag" style="background:rgba(79,126,247,0.15);color:var(--accent)">🚌 Acidente coletivo</span>'
+      : '<span class="hist-tag" style="background:rgba(247,92,92,0.15);color:var(--danger)">🆘 Mal súbito</span>';
+    const consTag = (oc.tipo === 'mal_subito' || !oc.tipo) ? (cons ? '<span class="hist-tag consciente">Consciente</span>' : '<span class="hist-tag inconsciente">Inconsciente</span>') : '';
+    const recusaTag = (oc.aceita?.toLowerCase() === 'não' || oc.aceita?.toLowerCase() === 'nao') ? '<span class="hist-tag recusa">Recusou</span>' : '';
+    div.innerHTML = `
+      <div style="margin-bottom:6px">${tipoTag}</div>
+      <div class="hist-item-top">
+        <div class="hist-nome">${oc.tipoLabel || ''} ${oc.nome}</div>
+        <button class="hist-delete" data-action="btn-deletar-hist-${idx}" data-dyn="deletarOcorrencia(${idx})">🗑</button>
+      </div>
+      <div class="hist-local">📍 ${oc.terminal} — ${oc.local}</div>
+      <div class="hist-local">🕐 ${oc.horario} &nbsp;|&nbsp; 📅 ${oc.data}</div>
+      <div class="hist-tags">${consTag}${samuTag}${recusaTag}</div>`;
+    div.setAttribute('data-idx', idx);
+    div.onclick = function(e) {
+      if (e.target.classList.contains('hist-delete') || e.target.closest('.hist-delete')) {
+        var i = parseInt(e.target.closest('.hist-delete').getAttribute('data-idx'));
+        exec(function() { deletarOcorrencia(i); });
+        return;
+      }
+      Estado.histSelecionado = oc;
+      document.getElementById('modal-hist-title').textContent = oc.nome;
+      document.getElementById('modal-hist-text').textContent = oc.relatorio;
+      const fotosEl = document.getElementById('modal-hist-fotos');
+      fotosEl.innerHTML = '';
+      (oc.fotos || []).forEach(src => {
+        const img = document.createElement('img');
+        img.className = 'modal-foto-thumb';
+        img.src = src;
+        img.style.maxHeight = '200px';
+        fotosEl.appendChild(img);
+      });
+      abrirModal('modal-hist');
+    };
+    el.appendChild(div);
+  });
+}
+
+function deletarOcorrencia(idx) {
+  if (!confirm('Excluir este registro?')) return;
+  const lista = JSON.parse(localStorage.getItem('ocorrencias') || '[]');
+  lista.splice(idx, 1);
+  localStorage.setItem('ocorrencias', JSON.stringify(lista));
+  carregarHistorico();
+}
+
+// ════════════════════════════════════════════════════════════
+// CONFIGURAÇÕES
+// ════════════════════════════════════════════════════════════
+function carregarConfig() {
+  return JSON.parse(localStorage.getItem('config') || '{}');
+}
+
+function salvarConfig() {
+  const cfg = {
+    groqKey: document.getElementById('config-groq-key').value.trim(),
+    terminal: document.getElementById('config-terminal').value.trim(),
+    atendente: document.getElementById('config-atendente').value.trim(),
+  };
+  localStorage.setItem('config', JSON.stringify(cfg));
+  alert('✅ Configurações salvas!');
+  mostrarTela('screen-home');
+}
+
+function preencherConfig() {
+  const cfg = carregarConfig();
+  if (cfg.groqKey) document.getElementById('config-groq-key').value = cfg.groqKey;
+  if (cfg.terminal) document.getElementById('config-terminal').value = cfg.terminal;
+  if (cfg.atendente) document.getElementById('config-atendente').value = cfg.atendente;
+}
+
+// ════════════════════════════════════════════════════════════
+// MODAIS
+// ════════════════════════════════════════════════════════════
+function abrirModal(id) { document.getElementById(id).classList.add('active'); }
+function fecharModal(id) { document.getElementById(id).classList.remove('active'); }
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', function(e) {
+    if (e.target === this) fecharModal(this.id);
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+// OFFLINE DETECTION
+// ════════════════════════════════════════════════════════════
+function atualizarOnline() {
+  Estado.online = navigator.onLine;
+  document.getElementById('offline-badge').classList.toggle('hidden', Estado.online);
+}
+window.addEventListener('online', atualizarOnline);
+window.addEventListener('offline', atualizarOnline);
+
+// ════════════════════════════════════════════════════════════
+// BINDING DE EVENTOS
+// ════════════════════════════════════════════════════════════
+function bindBtn(dataAction, fn) {
+  var el = document.querySelector('[data-action="' + dataAction + '"]');
+  if (!el) return;
+  el.addEventListener('pointerup', function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!podeDisparar()) return;
+    exec(fn);
+  }, { passive: false });
+}
+
+function initEventos() {
+  bindBtn('btn-mal-subito', function() { iniciarOcorrencia('mal_subito'); });
+  bindBtn('btn-acidente-usuario', function() { iniciarOcorrencia('acidente_usuario'); });
+  bindBtn('btn-acidente-coletivo', function() { iniciarOcorrencia('acidente_coletivo'); });
+  bindBtn('btn-historico', function() { mostrarTela('screen-historico'); carregarHistorico(); });
+  bindBtn('btn-config', function() { mostrarTela('screen-config'); });
+  bindBtn('btn-mal-subito-tipo', function() { iniciarOcorrencia('mal_subito'); });
+  bindBtn('btn-acidente-usuario-tipo', function() { iniciarOcorrencia('acidente_usuario'); });
+  bindBtn('btn-acidente-coletivo-tipo', function() { iniciarOcorrencia('acidente_coletivo'); });
+  bindBtn('btn-home', function() { mostrarTela('screen-home'); });
+  bindBtn('btn-home-relatorio', function() { mostrarTela('screen-home'); });
+  bindBtn('btn-home-historico', function() { mostrarTela('screen-home'); });
+  bindBtn('btn-home-config', function() { mostrarTela('screen-home'); });
+  bindBtn('btn-cancelar', function() { confirmarCancelar(); });
+  bindBtn('btn-send', function() { enviarResposta(); });
+  bindBtn('btn-corrigir', function() { abrirCorrecao(); });
+  bindBtn('btn-pdf', function() { exportarPDF(); });
+  bindBtn('btn-whatsapp', function() { compartilharWhatsApp(); });
+  bindBtn('btn-salvar', function() { salvarOcorrencia(); });
+  bindBtn('btn-adicionar-foto', function() { adicionarFoto(); });
+  bindBtn('btn-camera', function() { abrirCamera(); });
+  bindBtn('btn-galeria', function() { abrirGaleria(); });
+  bindBtn('btn-fechar-modal-foto', function() { fecharModal('modal-foto-opcao'); });
+  bindBtn('btn-salvar-config', function() { salvarConfig(); });
+  bindBtn('btn-fechar-modal-hist', function() { fecharModal('modal-hist'); });
+  bindBtn('btn-pdf-hist', function() { exportarPDFHist(); });
+  bindBtn('btn-whatsapp-hist', function() { compartilharWhatsAppHist(); });
+  bindBtn('btn-fechar-modal-correcao', function() { fecharModal('modal-correcao'); });
+  bindBtn('btn-aplicar-correcao', function() { aplicarCorrecao(); });
+}
+
+// ════════════════════════════════════════════════════════════
+// FIX TECLADO ANDROID
+// ════════════════════════════════════════════════════════════
+function fixarAltura() {
+  var vh = window.innerHeight;
+  var screens = document.querySelectorAll('.screen');
+  screens.forEach(function(s) {
+    s.style.height = vh + 'px';
+  });
+}
+
+window.addEventListener('resize', fixarAltura);
+window.addEventListener('scroll', function() { window.scrollTo(0,0); });
+fixarAltura();
+
+document.addEventListener('focusin', function(e) {
+  if (e.target.id === 'chat-input') {
+    setTimeout(function() {
+      fixarAltura();
+      var msgs = document.getElementById('chat-messages');
+      if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    }, 300);
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+// INICIALIZAÇÃO
+// ════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+  atualizarOnline();
+  preencherConfig();
+  initEventos();
+  
+  var cfgInit = carregarConfig();
+  if (!cfgInit.groqKey) {
+    setTimeout(function() {
+      var go = confirm('Bem-vindo!\n\nPara usar com IA, configure sua chave da API Groq.\n\nDeseja configurar agora?');
+      if (go) mostrarTela('screen-config');
+    }, 800);
+  }
+});
+
+</script>
+<input type="file" id="foto-input-camera" accept="image/*" capture="environment" style="display:none" onchange="onFotoSelecionada(event)">
+<input type="file" id="foto-input-galeria" accept="image/*" style="display:none" onchange="onFotoSelecionada(event)">
+
+</body>
+</html>

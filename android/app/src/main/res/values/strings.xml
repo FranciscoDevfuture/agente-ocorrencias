@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Agente de Ocorrências</string>
+    <string name="title_activity_main">Agente de Ocorrências</string>
+    <string name="package_name">br.com.terminal.ocorrencias.agente</string>
+    <string name="custom_url_scheme">br.com.terminal.ocorrencias.agente</string>
+</resources>

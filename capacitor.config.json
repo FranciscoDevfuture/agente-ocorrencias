@@ -1,0 +1,11 @@
+{
+  "appId": "br.com.terminal.ocorrencias.agente",
+  "appName": "Agente de Ocorrências",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "cleartext": true
+  }
+}
