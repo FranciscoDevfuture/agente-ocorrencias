@@ -90,3 +90,24 @@ No app, acesse **Configurações** e informe:
 ## 📄 Licença
 
 MIT License
+
+
+
+Prints do Projeto
+
+
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/055570ba-b369-4c98-ac6c-68d0cd25dc9f" />
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/cb3d246c-2fa4-412b-a71c-d3d00c0136f4" />
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/39660cfb-ad33-431b-a011-6d7b9fe198cf" />
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/a9eb5bbe-8e1e-4142-82f8-0c1ca4055c72" />
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/fc9d481a-e763-4236-a69f-9f06159d845c" />
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/d865506b-b517-444a-8d03-24e80f439c6f" />
+<img width="738" height="1600" alt="image" src="https://github.com/user-attachments/assets/9f10bfd7-5b9c-4a1c-abbe-966909b2234e" />
+
+
+
+
+
+
+
+
